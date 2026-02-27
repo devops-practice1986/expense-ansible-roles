@@ -5,13 +5,6 @@
     - cryptography
     executable: pip3.9
 
-# - name: ansible to install boto3 and botocore
-#   ansible.builtin.pip:
-#     name:
-#     - boto3
-#     - botocore
-#   when: ansible_os_family == "RedHat"
-
 - name: disable default nodjs
   ansible.builtin.command: dnf module disable nodejs -y
 
