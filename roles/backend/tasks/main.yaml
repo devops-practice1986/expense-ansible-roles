@@ -1,0 +1,73 @@
+- name: ansible to install pymysql
+  ansible.builtin.pip:
+    name:
+    - PyMySQL
+    - cryptography
+    executable: pip3.9
+
+# - name: ansible to install boto3 and botocore
+#   ansible.builtin.pip:
+#     name:
+#     - boto3
+#     - botocore
+#   when: ansible_os_family == "RedHat"
+
+- name: disable default nodjs
+  ansible.builtin.command: dnf module disable nodejs -y
+
+- name: enable nodejs:20
+  ansible.builtin.command: dnf module enable nodejs:20 -y
+
+- name: install nodejs
+  ansible.builtin.package:
+    name: "{{ item }}"
+    state: present
+  loop:
+  - nodejs
+  - mysql
+
+- name: create expense user
+  ansible.builtin.user:
+    name: expense
+
+- name: Create a app directory 
+  ansible.builtin.file:
+    path: /app
+    state: directory
+  
+- name: Download backend code
+  ansible.builtin.get_url:
+    url: https://expense-builds.s3.us-east-1.amazonaws.com/expense-backend-v2.zip
+    dest: /tmp/backend.zip
+
+- name: Extract the code
+  ansible.builtin.unarchive:
+    src: /tmp/backend.zip #by default ansible thinks this is in ansible server
+    dest: /app
+    remote_src: yes
+
+- name: install dependencies
+  ansible.builtin.command: npm install
+  args:
+    chdir: /app
+
+- name: Copy backend service # copy only works for files without variables
+  #ansible.builtin.copy:
+  ansible.builtin.template:
+    src: backend.service.j2 # here file name is changed with .j2
+    dest: /etc/systemd/system/backend.service
+
+- name: import mysql data
+  community.mysql.mysql_db:
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    login_host: "{{ login_host }}"
+    target: /app/schema/backend.sql
+    name: all
+    state: import
+
+- name: daemon reload
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+    state: restarted
+    name: backend
